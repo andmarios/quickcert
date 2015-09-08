@@ -22,22 +22,23 @@ import (
 )
 
 var (
-	CAcertFile = flag.String("cacert", "CAcert.pem", "path to CA certificate")
-	CAkeyFile  = flag.String("cakey", "CAkey.pem", "path to CA key file")
-	outFile    = flag.String("out", "", "Prefix to output files (key.pem, crt.pem)")
-	encryptKey = flag.Bool("encrypt-key", false, "Encrypt the private key")
-	host       = flag.String("hosts", "", "Comma-separated hostnames and IPs to generate a certificate for")
-	validFrom  = flag.String("start-date", "", "Creation date formatted as Jan 1 15:04:05 2011")
-	validFor   = flag.Float64("duration", 365.25, "Duration in days that certificate is valid for")
-	isCA       = flag.Bool("ca", false, "The cert will be self-signed and set as its own CA (ignores cacert and cakey)")
-	rsaBits    = flag.Int("rsa-bits", 2048, "Size of RSA key to generate. Ignored if --ecdsa-curve is set")
-	ecdsaCurve = flag.String("ecdsa-curve", "", "ECDSA curve to use to generate a key. Valid values are P224, P256, P384, P521")
-	chain      = flag.Bool("chain", false, "If set the CA cert will be appended to the certificate file")
-	cnAttr     = flag.String("cn", "", "Certificate attribute: Common Name, as in 'example.com'")
-	cAttr      = flag.String("c", "Ankh-Morpork", "Certificate attribute: Country")
-	oAttr      = flag.String("o", "Unseen University", "Certificate attribute: Organization")
-	ouAttr     = flag.String("ou", "Library", "Certificate attribute: Organizational Unit")
-	email      = flag.String("emails", "", "Comma-separated emails to be added to the certificate")
+	CAcertFile   = flag.String("cacert", "CAcert.pem", "path to CA certificate")
+	CAkeyFile    = flag.String("cakey", "CAkey.pem", "path to CA key file")
+	outFile      = flag.String("out", "", "Prefix to output files (key.pem, crt.pem)")
+	encryptKey   = flag.Bool("encrypt-key", false, "Encrypt the private key")
+	host         = flag.String("hosts", "", "Comma-separated hostnames and IPs to generate a certificate for")
+	validFrom    = flag.String("start-date", "", "Creation date formatted as Jan 1 15:04:05 2011")
+	validFor     = flag.Float64("duration", 365.25, "Duration in days that certificate is valid for")
+	isCA         = flag.Bool("ca", false, "The cert will be self-signed and set as its own CA (ignores cacert and cakey)")
+	rsaBits      = flag.Int("rsa-bits", 2048, "Size of RSA key to generate. Ignored if --ecdsa-curve is set")
+	ecdsaCurve   = flag.String("ecdsa-curve", "", "ECDSA curve to use to generate a key. Valid values are P224, P256, P384, P521")
+	chain        = flag.Bool("chain", false, "If set the CA cert will be appended to the certificate file")
+	cnAttr       = flag.String("cn", "", "Certificate attribute: Common Name, as in 'example.com'")
+	cAttr        = flag.String("c", "Ankh-Morpork", "Certificate attribute: Country")
+	oAttr        = flag.String("o", "Unseen University", "Certificate attribute: Organization")
+	ouAttr       = flag.String("ou", "Library", "Certificate attribute: Organizational Unit")
+	email        = flag.String("emails", "", "Comma-separated emails to be added to the certificate")
+	printVersion = flag.Bool("version", false, "Print version and exit")
 )
 
 // publicKey detects the type of key and returns its PublicKey
@@ -119,6 +120,12 @@ ASK_CONFIRMATION:
 
 func main() {
 	flag.Parse()
+
+	if *printVersion {
+		fmt.Println("Quickcert v" + version)
+		fmt.Println("https://github.com/andmarios/quickcert")
+		os.Exit(0)
+	}
 
 	if len(*host) == 0 && !*isCA {
 		log.Fatalf("missing required --hosts parameter, cannot continue")
