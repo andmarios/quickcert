@@ -7,7 +7,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/json"
+	_ "encoding/json"
 	"encoding/pem"
 	"errors"
 	"flag"
@@ -85,7 +85,7 @@ func readDecodePemFile(file string) (*pem.Block, error) {
 
 func checkError(msg string, err error) {
 	if err != nil {
-		log.Fatalf(msg, err)
+		log.Fatal(msg, err.Error())
 	}
 }
 
@@ -99,10 +99,25 @@ func readPassword(msg string) ([]byte, error) {
 	return password, nil
 }
 
+func userConfirmation(msg string) error {
+ASK_CONFIRMATION:
+	var response = ""
+	fmt.Print(msg)
+	_, _ = fmt.Scanln(&response)
+	switch strings.ToLower(response) {
+	case "y", "":
+		return nil
+	case "n":
+		return errors.New("interrupted by user")
+	default:
+		goto ASK_CONFIRMATION
+	}
+}
+
 func main() {
 	flag.Parse()
 
-	if len(*host) == 0 {
+	if len(*host) == 0 && !*isCA {
 		log.Fatalf("missing required --host parameter, cannot continue")
 	}
 
@@ -194,12 +209,13 @@ func main() {
 			Country:            []string{"GR"},
 			Organization:       []string{"30ohm"},
 			OrganizationalUnit: []string{"Operations Division"},
+			CommonName:         "30ohm.com/emailAddress=31ohm@30ohm.com",
 		},
 		NotBefore: notBefore,
 		NotAfter:  notAfter,
 
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		BasicConstraintsValid: true,
 	}
 
@@ -224,8 +240,19 @@ func main() {
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, cacert, publicKey(privkey), cakey)
 	checkError("failed to create certificate: ", err)
 
-	// Save certificate to file
+	// Check if files to be written exist
 	outCrt := *outFile + "crt.pem"
+	outKey := *outFile + "key.pem"
+	if _, err := os.Stat(outCrt); err == nil {
+		checkError("Certificate file exists: ",
+			userConfirmation("Certificate file ("+outCrt+") exists. Overwrite? [Yn]: "))
+	}
+	if _, err := os.Stat(outKey); err == nil {
+		checkError("Key file exists: ",
+			userConfirmation("Key file ("+outKey+") exists. Overwrite? [Yn]: "))
+	}
+
+	// Save certificate to file
 	log.Println("Writing certificate file: ", outCrt)
 	certOut, err := os.Create(outCrt)
 	checkError("failed to open "+outCrt+" for writing: ", err)
@@ -236,7 +263,7 @@ func main() {
 	certOut.Close()
 
 	// Save private key to file
-	outKey := *outFile + "key.pem"
+	log.Println("Writing key file: ", outKey)
 	keyOut, err := os.OpenFile(outKey, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	checkError("failed to open key.pem for writing:", err)
 
@@ -257,6 +284,7 @@ func main() {
 	pem.Encode(keyOut, keyPemBlock)
 	keyOut.Close()
 
+	log.Println("Files written succesfully. Exiting.")
 	// log.Print("written key.pem\n")
 
 	// fmt.Println("============= Original ==================")
