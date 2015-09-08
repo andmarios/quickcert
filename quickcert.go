@@ -7,13 +7,11 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	_ "encoding/json"
 	"encoding/pem"
 	"errors"
 	"flag"
 	"fmt"
 	"golang.org/x/crypto/ssh/terminal"
-	_ "gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
 	"math/big"
@@ -28,13 +26,18 @@ var (
 	CAkeyFile  = flag.String("cakey", "CAkey.pem", "path to CA key file")
 	outFile    = flag.String("out", "", "Prefix to output files (key.pem, crt.pem)")
 	encryptKey = flag.Bool("encrypt-key", false, "Encrypt the private key")
-	host       = flag.String("host", "", "Comma-separated hostnames and IPs to generate a certificate for")
+	host       = flag.String("hosts", "", "Comma-separated hostnames and IPs to generate a certificate for")
 	validFrom  = flag.String("start-date", "", "Creation date formatted as Jan 1 15:04:05 2011")
 	validFor   = flag.Float64("duration", 365.25, "Duration in days that certificate is valid for")
 	isCA       = flag.Bool("ca", false, "The cert will be self-signed and set as its own CA (ignores cacert and cakey)")
 	rsaBits    = flag.Int("rsa-bits", 2048, "Size of RSA key to generate. Ignored if --ecdsa-curve is set")
 	ecdsaCurve = flag.String("ecdsa-curve", "", "ECDSA curve to use to generate a key. Valid values are P224, P256, P384, P521")
 	chain      = flag.Bool("chain", false, "If set the CA cert will be appended to the certificate file")
+	cnAttr     = flag.String("cn", "", "Certificate attribute: Common Name, as in 'example.com'")
+	cAttr      = flag.String("c", "Ankh-Morpork", "Certificate attribute: Country")
+	oAttr      = flag.String("o", "Unseen University", "Certificate attribute: Organization")
+	ouAttr     = flag.String("ou", "Library", "Certificate attribute: Organizational Unit")
+	email      = flag.String("emails", "", "Comma-separated emails to be added to the certificate")
 )
 
 // publicKey detects the type of key and returns its PublicKey
@@ -118,7 +121,7 @@ func main() {
 	flag.Parse()
 
 	if len(*host) == 0 && !*isCA {
-		log.Fatalf("missing required --host parameter, cannot continue")
+		log.Fatalf("missing required --hosts parameter, cannot continue")
 	}
 
 	var cacert *x509.Certificate
@@ -206,10 +209,10 @@ func main() {
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
-			Country:            []string{"GR"},
-			Organization:       []string{"30ohm"},
-			OrganizationalUnit: []string{"Operations Division"},
-			CommonName:         "30ohm.com/emailAddress=31ohm@30ohm.com",
+			Country:            []string{},
+			Organization:       []string{},
+			OrganizationalUnit: []string{},
+			CommonName:         "",
 		},
 		NotBefore: notBefore,
 		NotAfter:  notAfter,
@@ -218,6 +221,18 @@ func main() {
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		BasicConstraintsValid: true,
 	}
+	if len(*cnAttr) > 0 {
+		template.Subject.CommonName = *cnAttr
+	}
+	if len(*cAttr) > 0 {
+		template.Subject.Country = append(template.Subject.Country, *cAttr)
+	}
+	if len(*oAttr) > 0 {
+		template.Subject.Organization = append(template.Subject.Organization, *oAttr)
+	}
+	if len(*ouAttr) > 0 {
+		template.Subject.OrganizationalUnit = append(template.Subject.OrganizationalUnit, *ouAttr)
+	}
 
 	hosts := strings.Split(*host, ",")
 	for _, h := range hosts {
@@ -225,6 +240,12 @@ func main() {
 			template.IPAddresses = append(template.IPAddresses, ip)
 		} else {
 			template.DNSNames = append(template.DNSNames, h)
+		}
+	}
+	if len(*email) > 0 {
+		emails := strings.Split(*email, ",")
+		for _, e := range emails {
+			template.EmailAddresses = append(template.EmailAddresses, e)
 		}
 	}
 
@@ -285,30 +306,4 @@ func main() {
 	keyOut.Close()
 
 	log.Println("Files written succesfully. Exiting.")
-	// log.Print("written key.pem\n")
-
-	// fmt.Println("============= Original ==================")
-	// fmt.Println(template)
-	// fmt.Println("============= /Original =================")
-
-	// j, _ := json.Marshal(template)
-	// // fmt.Println(string(j))
-
-	// y, _ := yaml.Marshal(template)
-	// // fmt.Println(string(y))
-
-	// var jd, yd = x509.Certificate{}, x509.Certificate{}
-	// _ = json.Unmarshal(j, &jd)
-	// _ = yaml.Unmarshal(y, &yd)
-
-	// //	fmt.Println(string(y))
-	// //	fmt.Println(reflect.DeepEqual(jd, yd))
-
-	// fmt.Println("============= Json Enc ==================")
-	// fmt.Println(jd)
-	// fmt.Println("============= /Json Enc =================")
-
-	// fmt.Println("============= Yaml Enc ==================")
-	// fmt.Println(yd)
-	// fmt.Println("============= /Yaml Enc =================")
 }
