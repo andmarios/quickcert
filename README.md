@@ -12,7 +12,7 @@ In general you should create first a CA:
 
     quickcert -ca -out "RootCA-" -rsa-bits 4096 -duration 3652 -encrypt-key
 
-This will create you CA key (`RootCA-key.pem`) and your CA certificate (`RootCA-crt.pem`).
+This will create you CA key (`RootCA-key.pem`) and your CA certificate¹ (`RootCA-crt.pem`).
 
 Then you can create sets of private key and certificates to use with your applications:
 
@@ -29,6 +29,13 @@ There are other options too:
 For example you could set some attributes:
 
     quickcert -cacert RootCA-crt.pem -cakey RootCA-key.pem -hosts 127.0.0.1 -c "Ankh-Morpork" -o "Unseen University" -ou "Library" -cn "Ook" -duration 730.5
+
+**1:** Ideally you will install your CA certificate into your system. This is fairly
+complicated but in short, for Linux systems, you would do something like:
+
+    sudo mkdir /usr/local/share/ca-certificates
+    sudo cp RootCA-crt.pem /usr/local/share/ca-certificates/RootCA.crt
+    sudo update-ca-certificates --fresh
 
 ## Limitations
 
