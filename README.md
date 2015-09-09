@@ -37,6 +37,14 @@ complicated but in short, for Linux systems, you would do something like:
     sudo cp RootCA-crt.pem /usr/local/share/ca-certificates/RootCA.crt
     sudo update-ca-certificates --fresh
 
+## Installation
+
+The go way:
+
+    go get github.com/andmarios/quickcert
+
+If you use Gentoo, there is an [ebuild available](https://github.com/andmarios/ebuilds_backyard/tree/master/app-crypt/quickcert).
+
 ## Limitations
 
 Of course you can use any externally created CA private key - certificate pair. But
