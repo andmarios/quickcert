@@ -14,7 +14,7 @@
 # ln -s ../../git-hooks/pre-commit .git/hooks/pre-commit
 
 HASH="$(git rev-parse --short HEAD)"
-COMMITS="$(git log | wc -l)"
+COMMITS="$(git rev-list HEAD --count)"
 sed 's/version = .*/version = "'"$COMMITS"'.'"$HASH"'+"/' -i version.go
 git add version.go
 
