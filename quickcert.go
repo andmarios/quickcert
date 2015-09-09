@@ -37,10 +37,10 @@ var (
 	rsaBits      = flag.Int("rsa-bits", 2048, "Size of RSA key to generate. Ignored if --ecdsa-curve is set")
 	ecdsaCurve   = flag.String("ecdsa-curve", "", "ECDSA curve to use to generate a key. Valid values are P224, P256, P384, P521")
 	chain        = flag.Bool("chain", false, "If set the CA cert will be appended to the certificate file")
-	cnAttr       = flag.String("cn", "", "Certificate attribute: Common Name, as in 'example.com'")
-	cAttr        = flag.String("c", "Ankh-Morpork", "Certificate attribute: Country")
-	oAttr        = flag.String("o", "Unseen University", "Certificate attribute: Organization")
-	ouAttr       = flag.String("ou", "Library", "Certificate attribute: Organizational Unit")
+	cnAttr       = flag.String("CN", "", "Certificate attribute: Common Name, as in 'example.com'")
+	cAttr        = flag.String("C", "Ankh-Morpork", "Certificate attribute: Country")
+	oAttr        = flag.String("O", "Unseen University", "Certificate attribute: Organization")
+	ouAttr       = flag.String("OU", "Library", "Certificate attribute: Organizational Unit")
 	email        = flag.String("emails", "", "Comma-separated emails to be added to the certificate")
 	printVersion = flag.Bool("version", false, "Print version and exit")
 )
@@ -132,7 +132,8 @@ func main() {
 	}
 
 	if len(*host) == 0 && !*isCA {
-		log.Fatalf("missing required --hosts parameter, cannot continue")
+		fmt.Println("If you are not creating a CA pair, you need to set the -hosts parameter. Use -h for help.")
+		os.Exit(1)
 	}
 
 	var cacert *x509.Certificate
@@ -145,33 +146,33 @@ func main() {
 		// Read CAcert
 		log.Println("Reading CA certificate")
 		data, err := readDecodePemFile(*CAcertFile)
-		checkError("could not read ca key file: ", err)
+		checkError("Could not read ca key file: ", err)
 		cacert, err = x509.ParseCertificate(data.Bytes)
-		checkError("could not parse CA certificate: ", err)
+		checkError("Could not parse CA certificate: ", err)
 		cacertpem = data
 
 		// Read CAkey
 		log.Println("Reading CA private key")
 		data, err = readDecodePemFile(*CAkeyFile)
-		checkError("could not read ca key file: ", err)
+		checkError("Could not read ca key file: ", err)
 
 		// If encrypted, decrypt it
 		if x509.IsEncryptedPEMBlock(data) {
 			password, err := readPassword("CA key is encrypted\nEnter password: ")
 			checkError("Error reading CA private key password: ", err)
 			data.Bytes, err = x509.DecryptPEMBlock(data, []byte(password))
-			checkError("could not decrypt CA private key: ", err)
+			checkError("Could not decrypt CA private key: ", err)
 		}
 
 		// Detect type and parse key
 		if data.Type == "RSA PRIVATE KEY" {
 			cakey, err = x509.ParsePKCS1PrivateKey(data.Bytes)
-			checkError("could not parse CA RSA private key: ", err)
+			checkError("Could not parse CA RSA private key: ", err)
 		} else if data.Type == "EC PRIVATE KEY" {
 			cakey, err = x509.ParseECPrivateKey(data.Bytes)
-			checkError("could not parse CA ECDSA key: ", err)
+			checkError("Could not parse CA ECDSA key: ", err)
 		} else {
-			log.Fatalf("could not find a compatible private key type (%s), only RSA and ECDSA are accepted", data.Type)
+			log.Fatalf("Could not find a compatible private key type (%s), only RSA and ECDSA are accepted", data.Type)
 		}
 	}
 
@@ -195,9 +196,9 @@ func main() {
 	case "P521":
 		privkey, err = ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
 	default:
-		log.Fatalf("unrecognized elliptic curve: %q", *ecdsaCurve)
+		log.Fatalf("Unrecognized elliptic curve: %q", *ecdsaCurve)
 	}
-	checkError("failed to generate private key: ", err)
+	checkError("Failed to generate private key: ", err)
 
 	// Create certificate
 	log.Println("Generating certificate.")
@@ -206,7 +207,7 @@ func main() {
 		notBefore = time.Now()
 	} else {
 		notBefore, err = time.Parse("Jan 2 15:04:05 2006", *validFrom)
-		checkError("failed to parse creation date: ", err)
+		checkError("Failed to parse creation date: ", err)
 	}
 
 	// time.Duration takes nanoseconds    |--these are nsecs of a day--|
@@ -215,7 +216,7 @@ func main() {
 
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
-	checkError("failed to generate serial number: ", err)
+	checkError("Failed to generate serial number: ", err)
 
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
@@ -270,7 +271,7 @@ func main() {
 	// Sign certificate
 	log.Println("Signing certificate")
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, cacert, publicKey(privkey), cakey)
-	checkError("failed to create certificate: ", err)
+	checkError("Failed to create certificate: ", err)
 
 	// Check if files to be written exist
 	outCrt := *outFile + "crt.pem"
@@ -287,7 +288,7 @@ func main() {
 	// Save certificate to file
 	log.Println("Writing certificate file: ", outCrt)
 	certOut, err := os.Create(outCrt)
-	checkError("failed to open "+outCrt+" for writing: ", err)
+	checkError("Failed to open "+outCrt+" for writing: ", err)
 	pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 	if *chain {
 		pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: cacertpem.Bytes})
@@ -297,15 +298,15 @@ func main() {
 	// Save private key to file
 	log.Println("Writing key file: ", outKey)
 	keyOut, err := os.OpenFile(outKey, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	checkError("failed to open key.pem for writing:", err)
+	checkError("Failed to open key.pem for writing:", err)
 
 	keyPemBlock := pemBlockForKey(privkey)
 	if *encryptKey {
 	ASK_KEY:
 		pass1, err := readPassword("Enter password for private key: ")
-		checkError("error reading private key password, attempt 1: ", err)
+		checkError("Error reading private key password, attempt 1: ", err)
 		pass2, err := readPassword("Please re-enter password for private key: ")
-		checkError("error reading private key password, attempt 2: ", err)
+		checkError("Error reading private key password, attempt 2: ", err)
 		if string(pass1) == string(pass2) {
 			keyPemBlock, err = x509.EncryptPEMBlock(rand.Reader, keyPemBlock.Type, keyPemBlock.Bytes, pass1, x509.PEMCipher3DES)
 		} else {

@@ -28,7 +28,7 @@ There are other options too:
 
 For example you could set some attributes:
 
-    quickcert -cacert RootCA-crt.pem -cakey RootCA-key.pem -hosts 127.0.0.1 -c "Ankh-Morpork" -o "Unseen University" -ou "Library" -cn "Ook" -duration 730.5
+    quickcert -cacert RootCA-crt.pem -cakey RootCA-key.pem -hosts 127.0.0.1 -C "Ankh-Morpork" -O "Unseen University" -OU "Library" -CN "Ook" -duration 730.5
 
 **1:** Ideally you will install your CA certificate into your system. This is fairly
 complicated but in short, for Linux systems, you would do something like:
@@ -42,6 +42,13 @@ complicated but in short, for Linux systems, you would do something like:
 Of course you can use any externally created CA private key - certificate pair. But
 your CA certificate file should contain only your CA certificate. Chained CA
 certificates aren't supported yet.
+
+## Bugs
+
+If you press CTRL+C while `quickcert` is waiting for password input, you will return to
+your terminal with echo set off. Despite my attempts to handle this —and apparently
+<golang.org/x/crypto/ssh/terminal/util.go>'s ReadPassword also tries to handle this—
+I couldn't find a solution.
 
 ## Trivia
 
