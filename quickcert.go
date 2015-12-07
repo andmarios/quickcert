@@ -15,7 +15,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"golang.org/x/crypto/ssh/terminal"
 	"io/ioutil"
 	"log"
 	"math/big"
@@ -23,6 +22,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 var (
@@ -187,8 +188,11 @@ func main() {
 			log.Println("Consider upgrading your CA key 4096 bits.")
 		}
 		privkey, err = rsa.GenerateKey(rand.Reader, *rsaBits)
-	case "P224":
-		privkey, err = ecdsa.GenerateKey(elliptic.P224(), rand.Reader)
+		// I disabled P224 curve because Redhat patched their golang to
+		// not support this curve due to patent law reasons.
+		// I could leave it, but then quickcert won't compile on centos, rhel and fedora
+		//	case "P224":
+		//		privkey, err = ecdsa.GenerateKey(elliptic.P224(), rand.Reader)
 	case "P256":
 		privkey, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	case "P384":
