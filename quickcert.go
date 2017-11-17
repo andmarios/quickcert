@@ -1,4 +1,4 @@
-// Copyright (c) 2015, Marios Andreopoulos. All rights reserved.
+// Copyright (c) 2015-2017, Marios Andreopoulos. All rights reserved.
 // Use of this source code is governed by a BSD-style license that
 // can be found in the LICENSE file that should come with this code.
 
@@ -27,23 +27,24 @@ import (
 )
 
 var (
-	CAcertFile   = flag.String("cacert", "CAcert.pem", "path to CA certificate")
-	CAkeyFile    = flag.String("cakey", "CAkey.pem", "path to CA key file")
-	outFile      = flag.String("out", "", "Prefix to output files (key.pem, crt.pem)")
-	encryptKey   = flag.Bool("encrypt-key", false, "Encrypt the private key")
-	host         = flag.String("hosts", "", "Comma-separated hostnames and IPs to generate a certificate for")
-	validFrom    = flag.String("start-date", "", "Creation date formatted as Jan 1 15:04:05 2011")
-	validFor     = flag.Float64("duration", 365.25, "Duration in days that certificate is valid for")
-	isCA         = flag.Bool("ca", false, "The cert will be self-signed and set as its own CA (ignores cacert and cakey)")
-	rsaBits      = flag.Int("rsa-bits", 2048, "Size of RSA key to generate. Ignored if --ecdsa-curve is set")
-	ecdsaCurve   = flag.String("ecdsa-curve", "", "ECDSA curve to use to generate a key. Valid values are P224, P256, P384, P521")
-	chain        = flag.Bool("chain", false, "If set the CA cert will be appended to the certificate file")
-	cnAttr       = flag.String("CN", "", "Certificate attribute: Common Name, as in 'example.com'")
-	cAttr        = flag.String("C", "Ankh-Morpork", "Certificate attribute: Country")
-	oAttr        = flag.String("O", "Unseen University", "Certificate attribute: Organization")
-	ouAttr       = flag.String("OU", "Library", "Certificate attribute: Organizational Unit")
-	email        = flag.String("emails", "", "Comma-separated emails to be added to the certificate")
-	printVersion = flag.Bool("version", false, "Print version and exit")
+	CAcertFile     = flag.String("cacert", "CAcrt.pem", "path to CA certificate")
+	CAkeyFile      = flag.String("cakey", "CAkey.pem", "path to CA key file")
+	outFile        = flag.String("out", "", "Prefix to output files (key.pem, crt.pem)")
+	encryptKey     = flag.Bool("encrypt-key", false, "Encrypt the private key")
+	host           = flag.String("hosts", "", "Comma-separated hostnames and IPs to generate a certificate for")
+	validFrom      = flag.String("start-date", "", "Creation date formatted as Jan 1 15:04:05 2011")
+	validFor       = flag.Float64("duration", 365.25, "Duration in days that certificate is valid for")
+	isCA           = flag.Bool("ca", false, "The cert will be self-signed and set as its own CA (ignores cacert and cakey)")
+	crlDistrPoints = flag.String("crl-dp", "", "Comma-separated Certificate Revocation List Distribution Endpoints (optional, set it at CA level to propagate to client certs)")
+	rsaBits        = flag.Int("rsa-bits", 2048, "Size of RSA key to generate. Ignored if --ecdsa-curve is set")
+	ecdsaCurve     = flag.String("ecdsa-curve", "", "ECDSA curve to use to generate a key. Valid values are P224, P256, P384, P521")
+	chain          = flag.Bool("chain", false, "If set the CA cert will be appended to the certificate file")
+	cnAttr         = flag.String("CN", "", "Certificate attribute: Common Name, as in 'example.com'")
+	cAttr          = flag.String("C", "Ankh-Morpork", "Certificate attribute: Country")
+	oAttr          = flag.String("O", "Unseen University", "Certificate attribute: Organization")
+	ouAttr         = flag.String("OU", "Library", "Certificate attribute: Organizational Unit")
+	email          = flag.String("emails", "", "Comma-separated emails to be added to the certificate")
+	printVersion   = flag.Bool("version", false, "Print version and exit")
 )
 
 // publicKey detects the type of key and returns its PublicKey
@@ -214,8 +215,8 @@ func main() {
 		checkError("Failed to parse creation date: ", err)
 	}
 
-	// time.Duration takes nanoseconds    |--these are nsecs of a day--|
-	duration := time.Duration(*validFor * 24 * 3600 * 1000 * 1000 * 1000)
+	// time.Duration takes nanoseconds    |nsec in a day|
+	duration := time.Duration(*validFor * 24 * 3600 * 1e9)
 	notAfter := notBefore.Add(duration)
 
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
@@ -265,11 +266,22 @@ func main() {
 		}
 	}
 
+	var crlDistributionPoints []string
+	if len(*crlDistrPoints) > 0 {
+		crlDistributionPoints = strings.Split(*crlDistrPoints, ",")
+	}
+	if !*isCA && len(cacert.CRLDistributionPoints) > 0 {
+		crlDistributionPoints = append(crlDistributionPoints, cacert.CRLDistributionPoints...)
+	}
+	if len(crlDistributionPoints) > 0 {
+		template.CRLDistributionPoints = append(template.CRLDistributionPoints, crlDistributionPoints...)
+	}
+
 	if *isCA {
 		cakey = privkey
 		cacert = &template
 		template.IsCA = true
-		template.KeyUsage |= x509.KeyUsageCertSign
+		template.KeyUsage |= x509.KeyUsageCertSign | x509.KeyUsageCRLSign
 	}
 
 	// Sign certificate
