@@ -58,6 +58,10 @@ your terminal with echo set off. Despite my attempts to handle this —and appar
 <golang.org/x/crypto/ssh/terminal/util.go>'s ReadPassword also tries to handle this—
 I couldn't find a solution.
 
+Not a bug but a limitation, code could use better organisation. After the addition
+of revocation lists supports, the current code structure shows its elementary
+initial design.
+
 ## Trivia
 
 Default duration is 365.25 days since this is closer to the real duration of a year.

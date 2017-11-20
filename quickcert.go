@@ -29,7 +29,7 @@ import (
 var (
 	CAcertFile     = flag.String("cacert", "CAcrt.pem", "path to CA certificate")
 	CAkeyFile      = flag.String("cakey", "CAkey.pem", "path to CA key file")
-	outFile        = flag.String("out", "", "Prefix to output files (key.pem, crt.pem)")
+	outFile        = flag.String("out", "", "Prefix to output files (key.pem, crt.pem or crl.pem)")
 	encryptKey     = flag.Bool("encrypt-key", false, "Encrypt the private key")
 	host           = flag.String("hosts", "", "Comma-separated hostnames and IPs to generate a certificate for")
 	validFrom      = flag.String("start-date", "", "Creation date formatted as Jan 1 15:04:05 2011")
@@ -44,6 +44,8 @@ var (
 	oAttr          = flag.String("O", "Unseen University", "Certificate attribute: Organization")
 	ouAttr         = flag.String("OU", "Library", "Certificate attribute: Organizational Unit")
 	email          = flag.String("emails", "", "Comma-separated emails to be added to the certificate")
+	appendCRL      = flag.String("append-to-crl", "", "If provided when creating a CRL, the certificate will be added to this list.")
+	revokeCert     = flag.String("revoke-cert", "", "If provided, will create a CRL for this cerficate.")
 	printVersion   = flag.Bool("version", false, "Print version and exit")
 )
 
@@ -133,8 +135,19 @@ func main() {
 		os.Exit(0)
 	}
 
-	if len(*host) == 0 && !*isCA {
+	if len(*host) == 0 && !*isCA && len(*revokeCert) == 0 {
 		fmt.Println("If you are not creating a CA pair, you need to set the -hosts parameter. Use -h for help.")
+		os.Exit(1)
+	}
+
+	if *isCA && len(*revokeCert) > 0 {
+		fmt.Println("A self-signed Certificate Authority cannot have itself revoked!")
+		os.Exit(1)
+	}
+
+	if len(*host) > 0 && len(*revokeCert) > 0 {
+		fmt.Println("You asked to both create a cert-key pair (option -hosts enforce this) and to")
+		fmt.Println("create a certificate revocation list. These options are incompatible.")
 		os.Exit(1)
 	}
 
@@ -176,6 +189,51 @@ func main() {
 		} else {
 			log.Fatalf("Could not find a compatible private key type (%s), only RSA and ECDSA are accepted", data.Type)
 		}
+	}
+
+	if len(*revokeCert) > 0 {
+		var revokedCerts []pkix.RevokedCertificate
+		if len(*appendCRL) > 0 {
+			log.Println("Reading CLR")
+			data, err := readDecodePemFile(*appendCRL)
+			checkError("Could not read CRL file: ", err)
+			crl, err := x509.ParseCRL(data.Bytes)
+			checkError("Could not parse CRL: ", err)
+			revokedCerts = append(revokedCerts, crl.TBSCertList.RevokedCertificates...)
+		}
+		log.Println("Reading Certificate to Revoke")
+		data, err := readDecodePemFile(*revokeCert)
+		checkError("Could not read certificate file: ", err)
+		cert, err := x509.ParseCertificate(data.Bytes)
+		checkError("Could not parse certificate: ", err)
+
+		pool := x509.NewCertPool()
+		pool.AddCert(cacert)
+		opts := x509.VerifyOptions{Roots: pool}
+		_, err = cert.Verify(opts)
+		checkError("The certificate you want to revoke wasn't signed by this CA: ", err)
+
+		revokedCerts = append(revokedCerts, pkix.RevokedCertificate{
+			SerialNumber:   cert.SerialNumber,
+			RevocationTime: time.Now(),
+		})
+
+		crlDerBytes, err := cacert.CreateCRL(rand.Reader, cakey, revokedCerts, time.Now(), time.Now().AddDate(0, 1, 0))
+		checkError("Failed to create CRL: ", err)
+
+		outCrl := *outFile + "crl.pem"
+		if _, err := os.Stat(outCrl); err == nil {
+			checkError("CRL file exists: ",
+				userConfirmation("Certificate file ("+outCrl+") exists. Overwrite? [Yn]: "))
+		}
+
+		// Save CRL to file
+		log.Println("Writing CRL file: ", outCrl)
+		crlOut, err := os.Create(outCrl)
+		checkError("Failed to open "+outCrl+" for writing: ", err)
+		pem.Encode(crlOut, &pem.Block{Type: "X509 CRL", Bytes: crlDerBytes})
+		crlOut.Close()
+		os.Exit(0)
 	}
 
 	// Create new key
