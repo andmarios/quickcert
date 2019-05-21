@@ -1,4 +1,4 @@
-// Copyright (c) 2015-2017, Marios Andreopoulos. All rights reserved.
+// Copyright (c) 2015-2019, Marios Andreopoulos. All rights reserved.
 // Use of this source code is governed by a BSD-style license that
 // can be found in the LICENSE file that should come with this code.
 
@@ -195,11 +195,15 @@ func main() {
 		var revokedCerts []pkix.RevokedCertificate
 		if len(*appendCRL) > 0 {
 			log.Println("Reading CLR")
-			data, err := readDecodePemFile(*appendCRL)
-			checkError("Could not read CRL file: ", err)
-			crl, err := x509.ParseCRL(data.Bytes)
-			checkError("Could not parse CRL: ", err)
-			revokedCerts = append(revokedCerts, crl.TBSCertList.RevokedCertificates...)
+			if _, err := os.Stat(*appendCRL); os.IsNotExist(err) {
+				log.Println("CLR file does not exist, will create new: " + *appendCRL)
+			} else {
+				data, err := readDecodePemFile(*appendCRL)
+				checkError("Could not read CRL file: ", err)
+				crl, err := x509.ParseCRL(data.Bytes)
+				checkError("Could not parse CRL: ", err)
+				revokedCerts = append(revokedCerts, crl.TBSCertList.RevokedCertificates...)
+			}
 		}
 		log.Println("Reading Certificate to Revoke")
 		data, err := readDecodePemFile(*revokeCert)
@@ -221,14 +225,19 @@ func main() {
 		crlDerBytes, err := cacert.CreateCRL(rand.Reader, cakey, revokedCerts, time.Now(), time.Now().AddDate(0, 1, 0))
 		checkError("Failed to create CRL: ", err)
 
-		outCrl := *outFile + "crl.pem"
+		var outCrl string
+		if len(*appendCRL) > 0 {
+			outCrl = *appendCRL
+		} else {
+			outCrl = "crl.pem"
+		}
 		if _, err := os.Stat(outCrl); err == nil {
 			checkError("CRL file exists: ",
 				userConfirmation("Certificate file ("+outCrl+") exists. Overwrite? [Yn]: "))
 		}
 
 		// Save CRL to file
-		log.Println("Writing CRL file: ", outCrl)
+		log.Println("Writing CRL file: " + outCrl)
 		crlOut, err := os.Create(outCrl)
 		checkError("Failed to open "+outCrl+" for writing: ", err)
 		pem.Encode(crlOut, &pem.Block{Type: "X509 CRL", Bytes: crlDerBytes})

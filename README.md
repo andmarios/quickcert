@@ -37,6 +37,18 @@ complicated but in short, for Linux systems, you would do something like:
     sudo cp RootCA-crt.pem /usr/local/share/ca-certificates/RootCA.crt
     sudo update-ca-certificates --fresh
 
+### Revokation
+
+To revoke a certificate, you need a copy of it. It's a good idea to keep a copy
+of all the certificates you create —but not of the private keys.
+
+To create, or add a certificate to a Certificate Revocation List (CRL) run:
+
+    quickcert -cacert RootCA-crt.pem -cakey RootCA-key.pem -revoke-cert client.crt.pem -append-to-crl CRL.pem
+
+As an example, you can add `CRL.pem` to your OpenVPN server to deny access to
+revoked clients.
+
 ## Installation
 
 The go way:
