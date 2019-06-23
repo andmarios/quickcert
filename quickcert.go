@@ -222,7 +222,7 @@ func main() {
 			RevocationTime: time.Now(),
 		})
 
-		crlDerBytes, err := cacert.CreateCRL(rand.Reader, cakey, revokedCerts, time.Now(), time.Now().AddDate(0, 1, 0))
+		crlDerBytes, err := cacert.CreateCRL(rand.Reader, cakey, revokedCerts, time.Now(), time.Now().AddDate(1, 0, 0))
 		checkError("Failed to create CRL: ", err)
 
 		var outCrl string
